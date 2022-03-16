@@ -12,7 +12,7 @@ set(PLUGIN_AUTHOR "Norihiro Kamae")
 # Replace `com.example.obs-plugin-template` with a unique Bundle ID for macOS releases
 # (used both in the installer and when submitting the installer for notarization)
 set(MACOS_BUNDLEID "net.nagater.obs-async-source-duplication")
-set(ID_PREFIX "net.nagater.obs.")
+set(ID_PREFIX "net.nagater.obs-async-source-duplication.")
 
 # Replace `me@contoso.com` with the maintainer email address you want to put in Linux packages
 set(LINUX_MAINTAINER_EMAIL "norihiro@nagater.net")
