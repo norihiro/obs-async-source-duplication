@@ -28,6 +28,8 @@ To remove the filter,
 2. Select `Asynchronous Source Duplication Filter` in the bottom of `Audio/Video Filters` list.
 2. Click `-` at the bottom of `Audio/Video Filters` list.
 
+Note that the filter `Asynchronous Source Duplication Filter` should be located at the top so that other filters won't affect the duplicated source.
+
 ## Properties
 
 ### Source Name
