@@ -15,15 +15,18 @@ In such case, this plugin help you to duplicate the asynchronous source.
 
 ## Usage
 
-1. Add `Asynchronous Source Duplication Filter` to your source
-   1. Open filter dialog for the source you want to duplicate.
-   2. Click `+` at the bottom of `Audio/Video Filters` list.
-   3. Click `Asynchronous Source Duplication Filter`.
-2. Add `Asynchronous Source Duplicator` to your scene
-   1. Select the scene you want to have the duplicated source.
-   2. Click `+` at the bottom of `Sources` list.
-   3. Click `Asynchronous Source Duplicator`.
-   4. Type the name of the source that you want to duplicate.
+To start to use,
+1. Select the scene you want to have the duplicated source.
+2. Click `+` at the bottom of `Sources` list.
+3. Click `Asynchronous Source Duplicator`.
+4. Select the name of the source that you want to duplicate.
+5. Click `Insert Filter to the Source` button.
+   This step will add a filter to the source you selected above.
+
+To remove the filter,
+1. Open filter dialog for the source.
+2. Select `Asynchronous Source Duplication Filter` in the bottom of `Audio/Video Filters` list.
+2. Click `-` at the bottom of `Audio/Video Filters` list.
 
 ## Properties
 

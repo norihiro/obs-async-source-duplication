@@ -1,5 +1,6 @@
 #include <obs-module.h>
 #include <util/threading.h>
+#include <util/dstr.h>
 #include "plugin-macros.generated.h"
 
 struct source_s
@@ -20,13 +21,110 @@ static const char *get_name(void *type_data)
 	return obs_module_text("Asynchronous Source Duplicator");
 }
 
+struct target_prop_info
+{
+	obs_property_t *prop;
+	struct source_s *s;
+};
+
+static bool add_target_sources_cb(void *data, obs_source_t *source)
+{
+	struct target_prop_info *info = data;
+
+	if (info->s && source == info->s->context)
+		return true;
+
+	uint32_t caps = obs_source_get_output_flags(source);
+	bool is_async_video = (caps & OBS_SOURCE_ASYNC_VIDEO) == OBS_SOURCE_ASYNC_VIDEO;
+	bool is_audio = !!(caps & OBS_SOURCE_AUDIO);
+	if (!is_async_video && !is_audio)
+		return true;
+
+	const char *name = obs_source_get_name(source);
+	obs_property_list_add_string(info->prop, name, name);
+
+	return true;
+}
+
+static inline obs_source_t *source_to_filter(obs_source_t *src);
+
+static bool target_source_modified_cb(obs_properties_t *props, obs_property_t *p, obs_data_t *settings)
+{
+	bool ret = false;
+
+	bool no_filter = false;
+	const char *target_source_name = obs_data_get_string(settings, "target_source_name");
+	obs_source_t *src = obs_get_source_by_name(target_source_name);
+	if (src) {
+		obs_source_t *target = source_to_filter(src);
+		if (!target)
+			no_filter = true;
+		obs_source_release(target);
+	}
+	obs_source_release(src);
+
+	obs_property_t *add_filter_button = obs_properties_get(props, "target_source_add_filter");
+	if (obs_property_visible(add_filter_button) != no_filter) {
+		obs_property_set_visible(add_filter_button, no_filter);
+		ret = true;
+	}
+
+	return ret;
+}
+
+static void add_filter(obs_source_t *src)
+{
+	const char *display_name = obs_source_get_display_name(ID_PREFIX "filter");
+	struct dstr name;
+	dstr_init_copy(&name, display_name);
+	obs_source_t *found;
+	int ix = 0;
+	while ((found = obs_source_get_filter_by_name(src, name.array))) {
+		obs_source_release(found);
+		dstr_printf(&name, "%s (%d)", display_name, ++ix);
+	}
+
+	obs_source_t *filter = obs_source_create_private(ID_PREFIX "filter", name.array, NULL);
+	obs_source_filter_add(src, filter);
+	blog(LOG_INFO, "added filter '%s' (%p) to source '%s'", name.array, filter, obs_source_get_name(src));
+	obs_source_release(filter);
+	dstr_free(&name);
+}
+
+static bool add_filter_cb(obs_properties_t *props, obs_property_t *property, void *data)
+{
+	if (!data)
+		return false;
+	struct source_s *s = data;
+
+	obs_source_t *src = obs_get_source_by_name(s->target_source_name);
+	if (src) {
+		add_filter(src);
+		s->target_check = 0.0f;
+		obs_property_t *add_filter_button = obs_properties_get(props, "target_source_add_filter");
+		obs_property_set_visible(add_filter_button, false);
+		return true;
+	}
+
+	return false;
+}
+
 static obs_properties_t *get_properties(void *data)
 {
-	UNUSED_PARAMETER(data);
 	obs_properties_t *props = obs_properties_create();
 	obs_property_t *prop;
+	obs_property_t *target_source_name;
 
-	obs_properties_add_text(props, "target_source_name", obs_module_text("Source Name"), OBS_TEXT_DEFAULT);
+	target_source_name = obs_properties_add_list(props, "target_source_name", obs_module_text("Source Name"),
+						     OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+
+	prop = obs_properties_add_button2(props, "target_source_add_filter",
+					  obs_module_text("Insert Filter to the Source"), add_filter_cb, data);
+	obs_property_set_visible(prop, false);
+
+	obs_property_set_modified_callback(target_source_name, target_source_modified_cb);
+	struct target_prop_info info = {target_source_name, data};
+	obs_enum_sources(add_target_sources_cb, &info);
 
 	return props;
 }
@@ -90,13 +188,6 @@ static inline obs_source_t *source_to_filter(obs_source_t *src)
 {
 	obs_source_t *target = NULL;
 	obs_source_enum_filters(src, find_filter, &target);
-
-	if (target)
-		blog(LOG_INFO, "found target filter \"%s\" in source \"%s\"", obs_source_get_name(target),
-		     obs_source_get_name(src));
-	else
-		blog(LOG_INFO, "not found the target filter in \"%s\"", obs_source_get_name(src));
-
 	return target;
 }
 
