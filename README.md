@@ -36,6 +36,11 @@ Note that the filter `Asynchronous Source Duplication Filter` should be located 
 
 Choose the source you want to duplicate.
 
+### Enable Buffering
+*Deprecated*
+
+Enable buffering of video frames in libobs. Default is disabled.
+
 ## Build and install
 ### Linux
 Use cmake to build on Linux. After checkout, run these commands.

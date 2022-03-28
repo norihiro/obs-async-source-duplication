@@ -126,6 +126,8 @@ static obs_properties_t *get_properties(void *data)
 	struct target_prop_info info = {target_source_name, data};
 	obs_enum_sources(add_target_sources_cb, &info);
 
+	obs_properties_add_bool(props, "buffered", obs_module_text("Enable Buffering"));
+
 	return props;
 }
 
@@ -223,6 +225,9 @@ static void update(void *data, obs_data_t *settings)
 		set_weak_target_by_name(s, target_source_name);
 	}
 	pthread_mutex_unlock(&s->target_update_mutex);
+
+	bool buffered = obs_data_get_bool(settings, "buffered");
+	obs_source_set_async_unbuffered(s->context, !buffered);
 }
 
 static void tick(void *data, float seconds)
