@@ -17,6 +17,9 @@ struct filter_s
 	pthread_mutex_t audio_mutex;
 	bool in_video;
 	bool in_audio;
+
+	volatile long show_refs;
+	volatile long active_refs;
 };
 
 static const char *get_name(void *type_data)
@@ -109,6 +112,42 @@ static inline int pthread_mutex_init_recursive(pthread_mutex_t *mutex)
 }
 #endif
 
+static void inc_showing(void *data, calldata_t *cd)
+{
+	UNUSED_PARAMETER(cd);
+	struct filter_s *s = data;
+
+	if (os_atomic_inc_long(&s->show_refs) == 1)
+		obs_source_inc_showing(obs_filter_get_parent(s->context));
+}
+
+static void dec_showing(void *data, calldata_t *cd)
+{
+	UNUSED_PARAMETER(cd);
+	struct filter_s *s = data;
+
+	if (os_atomic_dec_long(&s->show_refs) == 0)
+		obs_source_dec_showing(obs_filter_get_parent(s->context));
+}
+
+static void inc_active(void *data, calldata_t *cd)
+{
+	UNUSED_PARAMETER(cd);
+	struct filter_s *s = data;
+
+	if (os_atomic_inc_long(&s->active_refs) == 1)
+		obs_source_inc_active(obs_filter_get_parent(s->context));
+}
+
+static void dec_active(void *data, calldata_t *cd)
+{
+	UNUSED_PARAMETER(cd);
+	struct filter_s *s = data;
+
+	if (os_atomic_dec_long(&s->active_refs) == 0)
+		obs_source_dec_active(obs_filter_get_parent(s->context));
+}
+
 static void *create(obs_data_t *settings, obs_source_t *source)
 {
 	struct filter_s *s = bzalloc(sizeof(struct filter_s));
@@ -120,8 +159,24 @@ static void *create(obs_data_t *settings, obs_source_t *source)
 	// update(s, settings); // no properties in this filter.
 
 	signal_handler_add_array(obs_source_get_signal_handler(source), signals);
+	proc_handler_t *ph = obs_source_get_proc_handler(source);
+	proc_handler_add(ph, "void inc_showing()", inc_showing, s);
+	proc_handler_add(ph, "void dec_showing()", dec_showing, s);
+	proc_handler_add(ph, "void inc_active()", inc_active, s);
+	proc_handler_add(ph, "void dec_active()", dec_active, s);
 
 	return s;
+}
+
+static void filter_remove(void *data, obs_source_t *source)
+{
+	UNUSED_PARAMETER(source);
+	struct filter_s *s = data;
+
+	while (os_atomic_load_long(&s->active_refs) > 0)
+		dec_active(s, NULL);
+	while (os_atomic_load_long(&s->show_refs) > 0)
+		dec_showing(s, NULL);
 }
 
 static void destroy(void *data)
@@ -141,6 +196,7 @@ const struct obs_source_info async_srcdup_filter = {
 	.get_name = get_name,
 	.create = create,
 	.destroy = destroy,
+	.filter_remove = filter_remove,
 	.filter_video = async_filter_video,
 	.filter_audio = async_filter_audio,
 };

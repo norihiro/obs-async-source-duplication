@@ -13,6 +13,9 @@ struct source_s
 	pthread_mutex_t target_update_mutex;
 	obs_weak_source_t *target_weak;
 	float target_check;
+
+	bool shown;
+	bool activated;
 };
 
 static const char *get_name(void *type_data)
@@ -147,6 +150,30 @@ static void output_audio(void *data, calldata_t *cd)
 	obs_source_output_audio(s->context, audio);
 }
 
+static void target_inc_showing(obs_source_t *target)
+{
+	proc_handler_t *ph = obs_source_get_proc_handler(target);
+	proc_handler_call(ph, "inc_showing", NULL);
+}
+
+static void target_dec_showing(obs_source_t *target)
+{
+	proc_handler_t *ph = obs_source_get_proc_handler(target);
+	proc_handler_call(ph, "dec_showing", NULL);
+}
+
+static void target_inc_active(obs_source_t *target)
+{
+	proc_handler_t *ph = obs_source_get_proc_handler(target);
+	proc_handler_call(ph, "inc_active", NULL);
+}
+
+static void target_dec_active(obs_source_t *target)
+{
+	proc_handler_t *ph = obs_source_get_proc_handler(target);
+	proc_handler_call(ph, "dec_active", NULL);
+}
+
 static void release_weak_target(struct source_s *s)
 {
 	if (!s->target_weak)
@@ -157,6 +184,12 @@ static void release_weak_target(struct source_s *s)
 		signal_handler_t *sh = obs_source_get_signal_handler(target);
 		signal_handler_disconnect(sh, "output_video", output_video, s);
 		signal_handler_disconnect(sh, "output_audio", output_audio, s);
+
+		if (s->shown)
+			target_dec_showing(target);
+		if (s->activated)
+			target_dec_active(target);
+
 		obs_source_release(target);
 	}
 
@@ -174,6 +207,11 @@ static void set_weak_target(struct source_s *s, obs_source_t *target)
 	signal_handler_t *sh = obs_source_get_signal_handler(target);
 	signal_handler_connect(sh, "output_video", output_video, s);
 	signal_handler_connect(sh, "output_audio", output_audio, s);
+
+	if (s->shown)
+		target_inc_showing(target);
+	if (s->activated)
+		target_inc_active(target);
 }
 
 static void find_filter(obs_source_t *parent, obs_source_t *child, void *param)
@@ -271,6 +309,54 @@ static void destroy(void *data)
 	bfree(s);
 }
 
+static void show(void *data)
+{
+	struct source_s *s = data;
+
+	pthread_mutex_lock(&s->target_update_mutex);
+	obs_source_t *target = obs_weak_source_get_source(s->target_weak);
+	if (target && !s->shown)
+		target_inc_showing(target);
+	s->shown = true;
+	pthread_mutex_unlock(&s->target_update_mutex);
+}
+
+static void hide(void *data)
+{
+	struct source_s *s = data;
+
+	pthread_mutex_lock(&s->target_update_mutex);
+	obs_source_t *target = obs_weak_source_get_source(s->target_weak);
+	if (target && s->shown)
+		target_dec_showing(target);
+	s->shown = false;
+	pthread_mutex_unlock(&s->target_update_mutex);
+}
+
+static void activate(void *data)
+{
+	struct source_s *s = data;
+
+	pthread_mutex_lock(&s->target_update_mutex);
+	obs_source_t *target = obs_weak_source_get_source(s->target_weak);
+	if (target && !s->activated)
+		target_inc_active(target);
+	s->activated = true;
+	pthread_mutex_unlock(&s->target_update_mutex);
+}
+
+static void deactivate(void *data)
+{
+	struct source_s *s = data;
+
+	pthread_mutex_lock(&s->target_update_mutex);
+	obs_source_t *target = obs_weak_source_get_source(s->target_weak);
+	if (target && s->activated)
+		target_dec_active(target);
+	s->activated = false;
+	pthread_mutex_unlock(&s->target_update_mutex);
+}
+
 const struct obs_source_info async_srcdup_source = {
 	.id = ID_PREFIX "source",
 	.type = OBS_SOURCE_TYPE_INPUT,
@@ -281,4 +367,8 @@ const struct obs_source_info async_srcdup_source = {
 	.update = update,
 	.video_tick = tick,
 	.get_properties = get_properties,
+	.show = show,
+	.hide = hide,
+	.activate = activate,
+	.deactivate = deactivate,
 };
