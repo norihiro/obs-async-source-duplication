@@ -20,6 +20,8 @@ struct filter_s
 
 	volatile long show_refs;
 	volatile long active_refs;
+
+	gs_texrender_t *texrender;
 };
 
 static const char *get_name(void *type_data)
@@ -148,6 +150,26 @@ static void dec_active(void *data, calldata_t *cd)
 		obs_source_dec_active(obs_filter_get_parent(s->context));
 }
 
+static void offscreen_render_cb(void *data, uint32_t cx, uint32_t cy)
+{
+	struct filter_s *s = data;
+
+	if (os_atomic_load_long(&s->show_refs) <= 0)
+		return;
+
+	obs_source_t *parent = obs_filter_get_parent(s->context);
+	if (!parent)
+		return;
+
+	gs_texrender_reset(s->texrender);
+	if (!gs_texrender_begin(s->texrender, 1, 1))
+		return;
+
+	obs_source_video_render(parent);
+
+	gs_texrender_end(s->texrender);
+}
+
 static void *create(obs_data_t *settings, obs_source_t *source)
 {
 	struct filter_s *s = bzalloc(sizeof(struct filter_s));
@@ -155,6 +177,8 @@ static void *create(obs_data_t *settings, obs_source_t *source)
 
 	pthread_mutex_init_recursive(&s->video_mutex);
 	pthread_mutex_init_recursive(&s->audio_mutex);
+
+	s->texrender = gs_texrender_create(GS_BGRA, GS_ZS_NONE);
 
 	// update(s, settings); // no properties in this filter.
 
@@ -164,6 +188,8 @@ static void *create(obs_data_t *settings, obs_source_t *source)
 	proc_handler_add(ph, "void dec_showing()", dec_showing, s);
 	proc_handler_add(ph, "void inc_active()", inc_active, s);
 	proc_handler_add(ph, "void dec_active()", dec_active, s);
+
+	obs_add_main_render_callback(offscreen_render_cb, s);
 
 	return s;
 }
@@ -183,8 +209,12 @@ static void destroy(void *data)
 {
 	struct filter_s *s = data;
 
+	obs_remove_main_render_callback(offscreen_render_cb, s);
+
 	pthread_mutex_destroy(&s->audio_mutex);
 	pthread_mutex_destroy(&s->video_mutex);
+
+	gs_texrender_destroy(s->texrender);
 
 	bfree(s);
 }
