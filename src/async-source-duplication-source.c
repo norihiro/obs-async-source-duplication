@@ -106,6 +106,7 @@ static bool add_filter_cb(obs_properties_t *props, obs_property_t *property, voi
 		s->target_check = 0.0f;
 		obs_property_t *add_filter_button = obs_properties_get(props, "target_source_add_filter");
 		obs_property_set_visible(add_filter_button, false);
+		obs_source_release(src);
 		return true;
 	}
 
@@ -319,6 +320,7 @@ static void show(void *data)
 		target_inc_showing(target);
 	s->shown = true;
 	pthread_mutex_unlock(&s->target_update_mutex);
+	obs_source_release(target);
 }
 
 static void hide(void *data)
@@ -331,6 +333,7 @@ static void hide(void *data)
 		target_dec_showing(target);
 	s->shown = false;
 	pthread_mutex_unlock(&s->target_update_mutex);
+	obs_source_release(target);
 }
 
 static void activate(void *data)
@@ -343,6 +346,7 @@ static void activate(void *data)
 		target_inc_active(target);
 	s->activated = true;
 	pthread_mutex_unlock(&s->target_update_mutex);
+	obs_source_release(target);
 }
 
 static void deactivate(void *data)
@@ -355,6 +359,7 @@ static void deactivate(void *data)
 		target_dec_active(target);
 	s->activated = false;
 	pthread_mutex_unlock(&s->target_update_mutex);
+	obs_source_release(target);
 }
 
 const struct obs_source_info async_srcdup_source = {
