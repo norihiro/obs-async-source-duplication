@@ -214,7 +214,9 @@ static void destroy(void *data)
 	pthread_mutex_destroy(&s->audio_mutex);
 	pthread_mutex_destroy(&s->video_mutex);
 
+	obs_enter_graphics();
 	gs_texrender_destroy(s->texrender);
+	obs_leave_graphics();
 
 	bfree(s);
 }
