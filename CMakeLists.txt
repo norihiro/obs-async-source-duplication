@@ -8,6 +8,7 @@ set(MACOS_BUNDLEID "net.nagater.obs-async-source-duplication")
 set(ID_PREFIX "net.nagater.obs-async-source-duplication.")
 set(MACOS_PACKAGE_UUID "F3377825-5F69-443D-83E3-26ADC52DB3B9")
 set(MACOS_INSTALLER_UUID "D425E4A7-7F86-4DA7-B82B-3E597E9DCA5B")
+set(PLUGIN_URL "https://obsproject.com/forum/resources/asynchronous-source-duplication.1483/")
 
 set(LINUX_MAINTAINER_EMAIL "norihiro@nagater.net")
 
