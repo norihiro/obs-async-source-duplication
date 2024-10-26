@@ -1,4 +1,4 @@
-# OBS Asynchronous Source Duplication Plugin
+# Asynchronous Source Duplication Plugin for OBS Studio
 
 ## Introduction
 
