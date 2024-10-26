@@ -31,7 +31,7 @@ bool obs_module_load(void)
 {
 	obs_register_source(&async_srcdup_filter);
 	obs_register_source(&async_srcdup_source);
-	blog(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
+	blog(LOG_INFO, "plugin loaded (version %s)", PLUGIN_VERSION);
 	return true;
 }
 
